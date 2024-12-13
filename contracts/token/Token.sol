@@ -67,8 +67,9 @@ import "./IToken.sol";
 import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
 import "./TokenStorage.sol";
 import "../roles/AgentRoleUpgradeable.sol";
+import "@openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
-contract Token is IToken, AgentRoleUpgradeable, TokenStorage {
+contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
 
     /// modifiers
 
@@ -97,7 +98,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage {
      *  emits an `IdentityRegistryAdded` event
      *  emits a `ComplianceAdded` event
      */
-    function init(
+    function _initToken(
         address _identityRegistry,
         address _compliance,
         string memory _name,
@@ -105,7 +106,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage {
         uint8 _decimals,
         // _onchainID can be zero address if not set, can be set later by owner
         address _onchainID
-    ) external initializer {
+    ) virtual internal onlyInitializing {
         // that require is protecting legacy versions of TokenProxy contracts
         // as there was a bug with the initializer modifier on these proxies
         // that check is preventing attackers to call the init functions on those
@@ -221,11 +222,11 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage {
         address _from,
         address _to,
         uint256 _amount
-    ) external override whenNotPaused returns (bool) {
+    ) external override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
         require(!_frozen[_to] && !_frozen[_from], "wallet is frozen");
         require(_amount <= balanceOf(_from) - (_frozenTokens[_from]), "Insufficient Balance");
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(_from, _to, _amount)) {
-            _approve(_from, msg.sender, _allowances[_from][msg.sender] - (_amount));
+            _approve(_from, msg.sender, allowance(_from, msg.sender) - (_amount));
             _transfer(_from, _to, _amount);
             _tokenCompliance.transferred(_from, _to, _amount);
             return true;
