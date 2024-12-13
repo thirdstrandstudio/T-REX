@@ -121,11 +121,8 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
             && keccak256(abi.encode(_symbol)) != keccak256(abi.encode(""))
         , "invalid argument - empty string");
         require(0 <= _decimals && _decimals <= 18, "decimals between 0 and 18");
+        ERC20Upgradeable._init(_name, _symbol, _decimals);
         __Ownable_init(msg.sender);
-        _tokenName = _name;
-        _tokenSymbol = _symbol;
-        _tokenDecimals = _decimals;
-        _tokenOnchainID = _onchainID;
         _tokenPaused = true;
         setIdentityRegistry(_identityRegistry);
         setCompliance(_compliance);
@@ -222,7 +219,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
         address _from,
         address _to,
         uint256 _amount
-    ) external override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
+    ) external virtual override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
         require(!_frozen[_to] && !_frozen[_from], "wallet is frozen");
         require(_amount <= balanceOf(_from) - (_frozenTokens[_from]), "Insufficient Balance");
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(_from, _to, _amount)) {
@@ -325,15 +322,15 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
     /**
      *  @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() external view override returns (uint256) {
+    function totalSupply() public virtual view override(ERC20Upgradeable, IERC20) returns (uint256) {
         return _totalSupply;
     }
 
     /**
      *  @dev See {IERC20-allowance}.
      */
-    function allowance(address _owner, address _spender) external view virtual override returns (uint256) {
-        return _allowances[_owner][_spender];
+    function allowance(address _owner, address _spender) public view virtual override(ERC20Upgradeable, IERC20) returns (uint256) {
+        return ERC20Upgradeable.allowance(_owner, _spender);
     }
 
     /**
@@ -374,14 +371,14 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
     /**
      *  @dev See {IToken-decimals}.
      */
-    function decimals() external view override returns (uint8) {
+    function decimals() public virtual view override(ERC20Upgradeable, IERC20) returns (uint8) {
         return _tokenDecimals;
     }
 
     /**
      *  @dev See {IToken-name}.
      */
-    function name() external view override returns (string memory) {
+    function name() public virtual view override(ERC20Upgradeable, IERC20) returns (string memory) {
         return _tokenName;
     }
 
@@ -395,7 +392,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
     /**
      *  @dev See {IToken-symbol}.
      */
-    function symbol() external view override returns (string memory) {
+    function symbol() public virtual view override(ERC20Upgradeable, IERC20) returns (string memory) {
         return _tokenSymbol;
     }
 
@@ -572,22 +569,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
         _totalSupply = _totalSupply - _amount;
         emit Transfer(_userAddress, address(0), _amount);
     }
-
-    /**
-     *  @dev See {ERC20-_approve}.
-     */
-    function _approve(
-        address _owner,
-        address _spender,
-        uint256 _amount
-    ) internal virtual {
-        require(_owner != address(0), "ERC20: approve from the zero address");
-        require(_spender != address(0), "ERC20: approve to the zero address");
-
-        _allowances[_owner][_spender] = _amount;
-        emit Approval(_owner, _spender, _amount);
-    }
-
+    
     /**
      *  @dev See {ERC20-_beforeTokenTransfer}.
      */
