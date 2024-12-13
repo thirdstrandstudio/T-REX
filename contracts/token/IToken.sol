@@ -69,9 +69,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @dev interface
 interface IToken is IERC20 {
-
-    /// events
-
     /**
      *  this event is emitted when the token information is updated.
      *  the event is emitted by the token init function and by the setTokenInformation function
@@ -133,61 +130,6 @@ interface IToken is IERC20 {
      *  `_amount` is the amount of tokens that are unfrozen
      */
     event TokensUnfrozen(address indexed _userAddress, uint256 _amount);
-
-    /**
-     *  this event is emitted when the token is paused
-     *  the event is emitted by the pause function
-     *  `_userAddress` is the address of the wallet that called the pause function
-     */
-    event Paused(address _userAddress);
-
-    /**
-     *  this event is emitted when the token is unpaused
-     *  the event is emitted by the unpause function
-     *  `_userAddress` is the address of the wallet that called the unpause function
-     */
-    event Unpaused(address _userAddress);
-
-    /// functions
-
-    /**
-     *  @dev sets the token name
-     *  @param _name the name of token to set
-     *  Only the owner of the token smart contract can call this function
-     *  emits a `UpdatedTokenInformation` event
-     */
-    function setName(string calldata _name) external;
-
-    /**
-     *  @dev sets the token symbol
-     *  @param _symbol the token symbol to set
-     *  Only the owner of the token smart contract can call this function
-     *  emits a `UpdatedTokenInformation` event
-     */
-    function setSymbol(string calldata _symbol) external;
-
-    /**
-     *  @dev sets the onchain ID of the token
-     *  @param _onchainID the address of the onchain ID to set
-     *  Only the owner of the token smart contract can call this function
-     *  emits a `UpdatedTokenInformation` event
-     */
-    function setOnchainID(address _onchainID) external;
-
-    /**
-     *  @dev pauses the token contract, when contract is paused investors cannot transfer tokens anymore
-     *  This function can only be called by a wallet set as agent of the token
-     *  emits a `Paused` event
-     */
-    function pause() external;
-
-    /**
-     *  @dev unpauses the token contract, when contract is unpaused investors can transfer tokens
-     *  if their wallet is not blocked & if the amount to transfer is <= to the amount of free tokens
-     *  This function can only be called by a wallet set as agent of the token
-     *  emits an `Unpaused` event
-     */
-    function unpause() external;
 
     /**
      *  @dev sets an address frozen status for this token.
@@ -254,6 +196,30 @@ interface IToken is IERC20 {
         address _to,
         uint256 _amount
     ) external returns (bool);
+
+    /**
+     *  @dev sets the onchainID of the token
+     *  @param _onchainID the address of the onchainID to set
+     *  Only the owner of the token smart contract can call this function
+     *  emits an `UpdatedTokenInformation` event
+     */
+    function setOnchainID(address _onchainID) external;
+
+    /**
+     *  @dev sets the symbol of the token
+     *  @param _symbol the symbol of the token to set
+     *  Only the owner of the token smart contract can call this function
+     *  emits an `UpdatedTokenInformation` event
+     */
+    function setSymbol(string memory _symbol) external;
+
+    /**
+     *  @dev sets the name of the token
+     *  @param _name the name of the token to set
+     *  Only the owner of the token smart contract can call this function
+     *  emits an `UpdatedTokenInformation` event
+     */
+    function setName(string memory _name) external;
 
     /**
      *  @dev mint tokens on a wallet
@@ -435,6 +401,16 @@ interface IToken is IERC20 {
      *  @dev Returns the Compliance contract linked to the token
      */
     function compliance() external view returns (IModularCompliance);
+
+    /**
+     *  @dev pauses the token
+     */
+    function pause() external;
+    
+    /**
+     *  @dev unpauses the token
+     */
+    function unpause() external;
 
     /**
      * @dev Returns true if the contract is paused, and false otherwise.

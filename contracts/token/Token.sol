@@ -64,27 +64,17 @@
 pragma solidity ^0.8.20;
 
 import "./IToken.sol";
-import "@onchain-id/solidity/contracts/interface/IIdentity.sol";
+import "onchain-id-solidity/interface/IIdentity.sol";
 import "./TokenStorage.sol";
 import "../roles/AgentRoleUpgradeable.sol";
-import "@openzeppelin-contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-
-contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
+import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20CappedUpgradeable.sol";
+contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20PausableUpgradeable, ERC20CappedUpgradeable {
+    // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.ERC20")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant StorageLocation = 0x52c63247e1f47db19d5ce0460030c497f067ca4cebf71ba98eeadabe20bace00;
 
     /// modifiers
-
-    /// @dev Modifier to make a function callable only when the contract is not paused.
-    modifier whenNotPaused() {
-        require(!_tokenPaused, "Pausable: paused");
-        _;
-    }
-
-    /// @dev Modifier to make a function callable only when the contract is paused.
-    modifier whenPaused() {
-        require(_tokenPaused, "Pausable: not paused");
-        _;
-    }
-
     /**
      *  @dev the constructor initiates the token contract
      *  msg.sender is set automatically as the owner of the smart contract
@@ -104,6 +94,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
         string memory _name,
         string memory _symbol,
         uint8 _decimals,
+        uint256 _cap,
         // _onchainID can be zero address if not set, can be set later by owner
         address _onchainID
     ) virtual internal onlyInitializing {
@@ -121,81 +112,39 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
             && keccak256(abi.encode(_symbol)) != keccak256(abi.encode(""))
         , "invalid argument - empty string");
         require(0 <= _decimals && _decimals <= 18, "decimals between 0 and 18");
-        ERC20Upgradeable._init(_name, _symbol, _decimals);
-        __Ownable_init(msg.sender);
-        _tokenPaused = true;
+        ERC20Upgradeable.__ERC20_init(_name, _symbol);
+        ERC20PausableUpgradeable.__ERC20Pausable_init();
+        ERC20CappedUpgradeable.__ERC20Capped_init(_cap);
+        OwnableUpgradeable.__Ownable_init(msg.sender);
         setIdentityRegistry(_identityRegistry);
         setCompliance(_compliance);
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
+        _tokenOnchainID = _onchainID;
+        emit UpdatedTokenInformation(_name, _symbol, _decimals, _TOKEN_VERSION, _tokenOnchainID);
     }
 
-    /**
-     *  @dev See {IERC20-approve}.
-     */
-    function approve(address _spender, uint256 _amount) external virtual override returns (bool) {
-        _approve(msg.sender, _spender, _amount);
-        return true;
+    function getErcStorage() private pure returns (ERC20Storage storage $) {
+        assembly {
+            $.slot := StorageLocation
+        }
     }
 
-    /**
-     *  @dev See {ERC20-increaseAllowance}.
-     */
-    function increaseAllowance(address _spender, uint256 _addedValue) external virtual returns (bool) {
-        _approve(msg.sender, _spender, _allowances[msg.sender][_spender] + (_addedValue));
-        return true;
-    }
-
-    /**
-     *  @dev See {ERC20-decreaseAllowance}.
-     */
-    function decreaseAllowance(address _spender, uint256 _subtractedValue) external virtual returns (bool) {
-        _approve(msg.sender, _spender, _allowances[msg.sender][_spender] - _subtractedValue);
-        return true;
-    }
-
-    /**
-     *  @dev See {IToken-setName}.
-     */
-    function setName(string calldata _name) external override onlyOwner {
-        require(keccak256(abi.encode(_name)) != keccak256(abi.encode("")), "invalid argument - empty string");
-        _tokenName = _name;
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
-    }
-
-    /**
-     *  @dev See {IToken-setSymbol}.
-     */
-    function setSymbol(string calldata _symbol) external override onlyOwner {
-        require(keccak256(abi.encode(_symbol)) != keccak256(abi.encode("")), "invalid argument - empty string");
-        _tokenSymbol = _symbol;
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
-    }
-
-    /**
-     *  @dev See {IToken-setOnchainID}.
-     *  if _onchainID is set at zero address it means no ONCHAINID is bound to this token
-     */
     function setOnchainID(address _onchainID) external override onlyOwner {
         _tokenOnchainID = _onchainID;
-        emit UpdatedTokenInformation(_tokenName, _tokenSymbol, _tokenDecimals, _TOKEN_VERSION, _tokenOnchainID);
+        emit UpdatedTokenInformation(name(), symbol(), decimals(), _TOKEN_VERSION, _tokenOnchainID);
     }
 
-    /**
-     *  @dev See {IToken-pause}.
-     */
-    function pause() external override onlyAgent whenNotPaused {
-        _tokenPaused = true;
-        emit Paused(msg.sender);
+    function setSymbol(string memory _symbol) external override onlyOwner {
+        ERC20Storage storage $ = getErcStorage();
+        $._symbol = _symbol;
+        emit UpdatedTokenInformation(name(), _symbol, decimals(), _TOKEN_VERSION, _tokenOnchainID);
     }
 
-    /**
-     *  @dev See {IToken-unpause}.
-     */
-    function unpause() external override onlyAgent whenPaused {
-        _tokenPaused = false;
-        emit Unpaused(msg.sender);
+    function setName(string memory _name) external override onlyOwner {
+        ERC20Storage storage $ = getErcStorage();
+        $._name = _name;
+        emit UpdatedTokenInformation(_name, symbol(), decimals(), _TOKEN_VERSION, _tokenOnchainID);
     }
-
+    
     /**
      *  @dev See {IToken-batchTransfer}.
      */
@@ -204,6 +153,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
             transfer(_toList[i], _amounts[i]);
         }
     }
+    
 
     /**
      *  @notice ERC-20 overridden function that include logic to check for trade validity.
@@ -219,12 +169,11 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
         address _from,
         address _to,
         uint256 _amount
-    ) external virtual override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
+    ) public virtual override(ERC20Upgradeable, IERC20) whenNotPaused returns (bool) {
         require(!_frozen[_to] && !_frozen[_from], "wallet is frozen");
         require(_amount <= balanceOf(_from) - (_frozenTokens[_from]), "Insufficient Balance");
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(_from, _to, _amount)) {
-            _approve(_from, msg.sender, allowance(_from, msg.sender) - (_amount));
-            _transfer(_from, _to, _amount);
+            ERC20Upgradeable.transferFrom(_from, _to, _amount);
             _tokenCompliance.transferred(_from, _to, _amount);
             return true;
         }
@@ -320,20 +269,6 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
     }
 
     /**
-     *  @dev See {IERC20-totalSupply}.
-     */
-    function totalSupply() public virtual view override(ERC20Upgradeable, IERC20) returns (uint256) {
-        return _totalSupply;
-    }
-
-    /**
-     *  @dev See {IERC20-allowance}.
-     */
-    function allowance(address _owner, address _spender) public view virtual override(ERC20Upgradeable, IERC20) returns (uint256) {
-        return ERC20Upgradeable.allowance(_owner, _spender);
-    }
-
-    /**
      *  @dev See {IToken-identityRegistry}.
      */
     function identityRegistry() external view override returns (IIdentityRegistry) {
@@ -345,13 +280,6 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
      */
     function compliance() external view override returns (IModularCompliance) {
         return _tokenCompliance;
-    }
-
-    /**
-     *  @dev See {IToken-paused}.
-     */
-    function paused() external view override returns (bool) {
-        return _tokenPaused;
     }
 
     /**
@@ -369,20 +297,6 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
     }
 
     /**
-     *  @dev See {IToken-decimals}.
-     */
-    function decimals() public virtual view override(ERC20Upgradeable, IERC20) returns (uint8) {
-        return _tokenDecimals;
-    }
-
-    /**
-     *  @dev See {IToken-name}.
-     */
-    function name() public virtual view override(ERC20Upgradeable, IERC20) returns (string memory) {
-        return _tokenName;
-    }
-
-    /**
      *  @dev See {IToken-onchainID}.
      */
     function onchainID() external view override returns (address) {
@@ -390,37 +304,10 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
     }
 
     /**
-     *  @dev See {IToken-symbol}.
-     */
-    function symbol() public virtual view override(ERC20Upgradeable, IERC20) returns (string memory) {
-        return _tokenSymbol;
-    }
-
-    /**
      *  @dev See {IToken-version}.
      */
     function version() external pure override returns (string memory) {
         return _TOKEN_VERSION;
-    }
-
-    /**
-     *  @notice ERC-20 overridden function that include logic to check for trade validity.
-     *  Require that the msg.sender and to addresses are not frozen.
-     *  Require that the value should not exceed available balance .
-     *  Require that the to address is a verified address
-     *  @param _to The address of the receiver
-     *  @param _amount The number of tokens to transfer
-     *  @return `true` if successful and revert if unsuccessful
-     */
-    function transfer(address _to, uint256 _amount) public override whenNotPaused returns (bool) {
-        require(!_frozen[_to] && !_frozen[msg.sender], "wallet is frozen");
-        require(_amount <= balanceOf(msg.sender) - (_frozenTokens[msg.sender]), "Insufficient Balance");
-        if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(msg.sender, _to, _amount)) {
-            _transfer(msg.sender, _to, _amount);
-            _tokenCompliance.transferred(msg.sender, _to, _amount);
-            return true;
-        }
-        revert("Transfer not possible");
     }
 
     /**
@@ -519,57 +406,54 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20Upgradeable {
         emit ComplianceAdded(_compliance);
     }
 
-    /**
-     *  @dev See {IERC20-balanceOf}.
-     */
-    function balanceOf(address _userAddress) public view override returns (uint256) {
-        return _balances[_userAddress];
+    function name() public virtual view override(ERC20Upgradeable, IToken) returns (string memory) {
+        return ERC20Upgradeable.name();
+    }
+
+    function decimals() public virtual view override(ERC20Upgradeable, IToken) returns (uint8) {
+        return ERC20Upgradeable.decimals();
+    }
+
+    function symbol() public virtual view override(ERC20Upgradeable, IToken) returns (string memory) {
+        return ERC20Upgradeable.symbol();
+    }
+
+    function paused() public virtual view override(IToken, PausableUpgradeable) returns (bool) {
+        return PausableUpgradeable.paused();
+    }
+
+    function _update(address from, address to, uint256 value) internal virtual override(ERC20CappedUpgradeable, ERC20PausableUpgradeable) whenNotPaused {
+        ERC20CappedUpgradeable._update(from, to, value);
     }
 
     /**
-     *  @dev See {ERC20-_transfer}.
+     *  @notice ERC-20 overridden function that include logic to check for trade validity.
+     *  Require that the msg.sender and to addresses are not frozen.
+     *  Require that the value should not exceed available balance .
+     *  Require that the to address is a verified address
+     *  @param _to The address of the receiver
+     *  @param _amount The number of tokens to transfer
+     *  @return `true` if successful and revert if unsuccessful
      */
-    function _transfer(
-        address _from,
-        address _to,
-        uint256 _amount
-    ) internal virtual {
-        require(_from != address(0), "ERC20: transfer from the zero address");
-        require(_to != address(0), "ERC20: transfer to the zero address");
-
-        _beforeTokenTransfer(_from, _to, _amount);
-
-        _balances[_from] = _balances[_from] - _amount;
-        _balances[_to] = _balances[_to] + _amount;
-        emit Transfer(_from, _to, _amount);
+    function transfer(address _to, uint256 _amount) public override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
+        require(!_frozen[_to] && !_frozen[msg.sender], "wallet is frozen");
+        require(_amount <= balanceOf(msg.sender) - (_frozenTokens[msg.sender]), "Insufficient Balance");
+        if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(msg.sender, _to, _amount)) {
+            ERC20Upgradeable._transfer(msg.sender, _to, _amount);
+            _tokenCompliance.transferred(msg.sender, _to, _amount);
+            return true;
+        }
+        revert("Transfer not possible");
     }
 
-    /**
-     *  @dev See {ERC20-_mint}.
-     */
-    function _mint(address _userAddress, uint256 _amount) internal virtual {
-        require(_userAddress != address(0), "ERC20: mint to the zero address");
-
-        _beforeTokenTransfer(address(0), _userAddress, _amount);
-
-        _totalSupply = _totalSupply + _amount;
-        _balances[_userAddress] = _balances[_userAddress] + _amount;
-        emit Transfer(address(0), _userAddress, _amount);
+    function pause() external override onlyOwner {
+        _pause();
     }
 
-    /**
-     *  @dev See {ERC20-_burn}.
-     */
-    function _burn(address _userAddress, uint256 _amount) internal virtual {
-        require(_userAddress != address(0), "ERC20: burn from the zero address");
-
-        _beforeTokenTransfer(_userAddress, address(0), _amount);
-
-        _balances[_userAddress] = _balances[_userAddress] - _amount;
-        _totalSupply = _totalSupply - _amount;
-        emit Transfer(_userAddress, address(0), _amount);
+    function unpause() external override onlyOwner {
+        _unpause();
     }
-    
+
     /**
      *  @dev See {ERC20-_beforeTokenTransfer}.
      */

@@ -65,6 +65,7 @@ pragma solidity ^0.8.20;
 import "../features/CountryWhitelisting.sol";
 
 contract CountryWhitelistingTest is CountryWhitelisting {
+
     /**
     *  @dev See {ICompliance-transferred}.
     */

@@ -66,7 +66,7 @@ import "../roles/AgentRole.sol";
 import "../token/IToken.sol";
 
 
-contract DVDTransferManager is Ownable {
+contract DVDTransferManager is Ownable(msg.sender) {
 
     /// Types
 

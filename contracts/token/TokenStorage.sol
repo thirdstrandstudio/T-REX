@@ -66,23 +66,13 @@ import "../compliance/modular/IModularCompliance.sol";
 import "../registry/interface/IIdentityRegistry.sol";
 
 contract TokenStorage {
-    /// @dev ERC20 basic variables
-    mapping(address => uint256) internal _balances;
-    mapping(address => mapping(address => uint256)) internal _allowances;
-    uint256 internal _totalSupply;
-
     /// @dev Token information
-    string internal _tokenName;
-    string internal _tokenSymbol;
-    uint8 internal _tokenDecimals;
     address internal _tokenOnchainID;
     string internal constant _TOKEN_VERSION = "4.1.3";
 
     /// @dev Variables of freeze and pause functions
     mapping(address => bool) internal _frozen;
     mapping(address => uint256) internal _frozenTokens;
-
-    bool internal _tokenPaused = false;
 
     /// @dev Identity Registry contract used by the onchain validator system
     IIdentityRegistry internal _tokenIdentityRegistry;

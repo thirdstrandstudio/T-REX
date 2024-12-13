@@ -67,7 +67,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "../../Roles.sol";
 
-contract AgentRoles is Ownable {
+contract AgentRoles is Ownable(msg.sender) {
     using Roles for Roles.Role;
 
     /// variables
