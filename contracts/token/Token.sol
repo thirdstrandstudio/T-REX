@@ -435,7 +435,7 @@ contract Token is IToken, AgentRoleUpgradeable, TokenStorage, ERC20PausableUpgra
      *  @param _amount The number of tokens to transfer
      *  @return `true` if successful and revert if unsuccessful
      */
-    function transfer(address _to, uint256 _amount) public override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
+    function transfer(address _to, uint256 _amount) public virtual override(IERC20, ERC20Upgradeable) whenNotPaused returns (bool) {
         require(!_frozen[_to] && !_frozen[msg.sender], "wallet is frozen");
         require(_amount <= balanceOf(msg.sender) - (_frozenTokens[msg.sender]), "Insufficient Balance");
         if (_tokenIdentityRegistry.isVerified(_to) && _tokenCompliance.canTransfer(msg.sender, _to, _amount)) {
