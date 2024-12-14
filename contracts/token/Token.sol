@@ -64,7 +64,6 @@
 pragma solidity ^0.8.20;
 
 import "./IToken.sol";
-import "onchain-id-solidity/interface/IIdentity.sol";
 import "./TokenStorage.sol";
 import "../roles/AgentRoleUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
